@@ -84,6 +84,13 @@ function handleCameraClick(){
 
 async function handleCameraChange(){
     await getMedia(camerasSelect.value);
+    if(myPeerConnection){
+        const videoTrack = myStream.getVideoTracks()[0];
+        const videoSender = myPeerConnection
+            .getSenders()
+            .find(sender => sender.track.kind === "video");
+        videoSender.replaceTrack(videoTrack);
+    } // 다른 카메라를 사용함으로써 화면 전환되는지는 학교가서 실험
 }
 
 muteBtn.addEventListener("click", handleMuteClick);
@@ -147,7 +154,6 @@ socket.on("ice", (ice) => {
 function makeConnection(){  
     myPeerConnection = new RTCPeerConnection();
     myPeerConnection.addEventListener("icecandidate", handleIce);
-//    myPeerConnection.addEventListener("addstream", handleAddStream); nico video
     myPeerConnection.addEventListener("track", (data) => {
         const peerFace = document.getElementById("peerFace");
         peerFace.srcObject = data.streams[0];
@@ -162,7 +168,5 @@ function handleIce(data) {
     socket.emit("ice", data.candidate, roomName);
 }
 
-// function handleAddStream(data){
-//     const peerFace = document.getElementById("peerFace");
-//     peerFace.srcObject = data.stream;
-// }
+// 3.8 실행할때 터미널을 2개 띄워서 하나는 node src/server.js를 실행
+// 다른 하나는 lt --port 3000을 실행시켜 접속한 뒤 핸드폰으로 url을 들어간다.
