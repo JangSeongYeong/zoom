@@ -14,6 +14,7 @@ let muted = false;
 let cameraOff = false;
 let roomName;
 let myPeerConnection;
+let myDataChannel;
 
 async function getCameras(){
     try {
@@ -124,6 +125,9 @@ welcomeForm.addEventListener("submit", handleWelcomeSubmit);
 //Socket Code
 
 socket.on("welcome", async () => {
+    myDataChannel = myPeerConnection.createDataChannel("chat");
+    myDataChannel.addEventListener("message", (event) => {console.log(event.data)});
+    console.log("made data channel");
     const offer = await myPeerConnection.createOffer();
     myPeerConnection.setLocalDescription(offer);
     console.log("sent the offer");
@@ -131,6 +135,10 @@ socket.on("welcome", async () => {
 });
 
 socket.on("offer", async(offer) => {
+    myPeerConnection.addEventListener("datachannel", (event) => {
+        myDataChannel = event.channel;
+        myDataChannel.addEventListener("message", (event)=>{console.log(event.data)});
+    });
     console.log("received the offer");
     myPeerConnection.setRemoteDescription(offer);
     const answer = await myPeerConnection.createAnswer();
@@ -152,7 +160,21 @@ socket.on("ice", (ice) => {
 // RTC Code
 //addStream()대신에 사용, track을 개별적으로 추가하는 함수
 function makeConnection(){  
-    myPeerConnection = new RTCPeerConnection();
+    myPeerConnection = new RTCPeerConnection({
+        iceServers: [ 
+            // 구글 무료제공 STUN서버 (테스트용, 내가 애플리케이션을 만들때는 내 전용으로 만들어야 함)
+            // STUN서버는 공용주소를 알아내기 위해서 사용하는 것 -> 다른 네크워크에서도 연결가능 (매우 중요!) 3.9
+            {
+                urls: [
+                    "stun:stun.l.google.com:19302",
+                    "stun:stun1.l.google.com:19302",
+                    "stun:stun2.l.google.com:19302",
+                    "stun:stun3.l.google.com:19302",
+                    "stun:stun4.l.google.com:19302",
+                ],
+            },
+        ],
+    });
     myPeerConnection.addEventListener("icecandidate", handleIce);
     myPeerConnection.addEventListener("track", (data) => {
         const peerFace = document.getElementById("peerFace");
@@ -170,3 +192,9 @@ function handleIce(data) {
 
 // 3.8 실행할때 터미널을 2개 띄워서 하나는 node src/server.js를 실행
 // 다른 하나는 lt --port 3000을 실행시켜 접속한 뒤 핸드폰으로 url을 들어간다.
+
+// webRTC 쓰는 사람 대부분은 Data Channel을 많이 사용한다.
+
+/* webRTC를 사용하면 안되는 곳
+1. 너무 많은 peer를 가질때 (사용자) -> 이것에 대한 보완하는 방법으로 SFU가 있다. 
+*/
