@@ -96,17 +96,18 @@ camerasSelect.addEventListener("input", handleCameraChange);
 const welcome = document.getElementById("welcome");
 const welcomeForm = welcome.querySelector("form");
 
-async function startMedia(){
+async function initCall(){
     welcome.hidden = true;
     call.hidden = false;
     await getMedia();
     makeConnection();
 }
 
-function handleWelcomeSubmit(event) {
+async function handleWelcomeSubmit(event) {
     event.preventDefault();
     const input = welcomeForm.querySelector("input");
-    socket.emit("join_room", input.value, startMedia);
+    await initCall()
+    socket.emit("join_room", input.value);
     roomName = input.value;
     input.value = "";
 }
@@ -122,15 +123,46 @@ socket.on("welcome", async () => {
     socket.emit("offer", offer, roomName);
 });
 
-socket.on("offer", (offer) => {
-    console.log(offer);
+socket.on("offer", async(offer) => {
+    console.log("received the offer");
+    myPeerConnection.setRemoteDescription(offer);
+    const answer = await myPeerConnection.createAnswer();
+    myPeerConnection.setLocalDescription(answer);
+    socket.emit("answer", answer, roomName);
+    console.log("sent the answer");
+});
+
+socket.on("answer", (answer) => {
+    console.log("received the answer");
+    myPeerConnection.setRemoteDescription(answer);    
+});
+
+socket.on("ice", (ice) => {
+    console.log("receveid candidate");
+    myPeerConnection.addIceCandidate(ice);
 });
 
 // RTC Code
-
-function makeConnection(){
+//addStream()대신에 사용, track을 개별적으로 추가하는 함수
+function makeConnection(){  
     myPeerConnection = new RTCPeerConnection();
+    myPeerConnection.addEventListener("icecandidate", handleIce);
+//    myPeerConnection.addEventListener("addstream", handleAddStream); nico video
+    myPeerConnection.addEventListener("track", (data) => {
+        const peerFace = document.getElementById("peerFace");
+        peerFace.srcObject = data.streams[0];
+        }); // addStream의 사용중지로 인한 다른 코드
     myStream
         .getTracks() // 윈도우는 같은 카메라를 다른 브라우저 2개로 접속할 수 없다. (동일 브라우저로 접속)
         .forEach(track => myPeerConnection.addTrack(track, myStream));
 }
+
+function handleIce(data) {
+    console.log("sent candidate");
+    socket.emit("ice", data.candidate, roomName);
+}
+
+// function handleAddStream(data){
+//     const peerFace = document.getElementById("peerFace");
+//     peerFace.srcObject = data.stream;
+// }
